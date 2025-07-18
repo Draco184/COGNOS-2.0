@@ -4,28 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="1172cbd2-5f0b-4289-b527-ef30523400d4" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/ProjectCOGNOS.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.streamlit/config.toml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/README_DEPLOYMENT.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app_standalone.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/config.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/data_processor.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/forecasting_engine.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/requirements_core.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/requirements_minimal.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/simple_forecasting_engine.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/streamlit_app.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/streamlit_app_core.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/visualizer.py" afterDir="false" />
-    </list>
+    <list default="true" id="1172cbd2-5f0b-4289-b527-ef30523400d4" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -51,7 +30,7 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager": "true",
     "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "master",
+    "git-widget-placeholder": "main",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -75,7 +54,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1752840878589</updated>
-      <workItem from="1752840878589" duration="5336000" />
+      <workItem from="1752840878589" duration="5660000" />
     </task>
     <servers />
   </component>

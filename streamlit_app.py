@@ -2,22 +2,32 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-import plotly.express as px
-from plotly.subplots import make_subplots
-import matplotlib.pyplot as plt
-import seaborn as sns
-from data_processor import DataProcessor
-from forecasting_engine import ForecastingEngine
-import yfinance as yf
 from datetime import datetime, timedelta
-import io
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.neural_network import MLPRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+import warnings
+warnings.filterwarnings('ignore')
 
 # Page configuration
 st.set_page_config(
-    page_title="Time Series Forecasting Engine",
-    page_icon="📈",
+    page_title="COGNOS 2.0 - Time Series Forecasting",
+    page_icon="🧠",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    menu_items={
+        'Get Help': 'https://github.com/yourusername/cognos-2.0',
+        'Report a bug': 'https://github.com/yourusername/cognos-2.0/issues',
+        'About': """
+        # COGNOS 2.0
+        Advanced Time Series Forecasting Engine
+        
+        Built with ❤️ using Streamlit and scikit-learn
+        """
+    }
 )
 
 # Custom CSS
@@ -38,8 +48,174 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+class DataProcessor:
+    """Handle data loading, cleaning, and preprocessing for time series forecasting"""
+
+    def __init__(self):
+        self.scaler = None
+
+    def detect_date_column(self, df):
+        """Automatically detect date/datetime columns"""
+        date_columns = []
+        for col in df.columns:
+            if df[col].dtype == 'object':
+                try:
+                    pd.to_datetime(df[col].head())
+                    date_columns.append(col)
+                except:
+                    continue
+        return date_columns
+
+    def prepare_time_series(self, df, date_col, target_col, freq='D'):
+        """Prepare data for time series analysis"""
+        # Convert date column to datetime
+        df[date_col] = pd.to_datetime(df[date_col])
+
+        # Set date as index
+        df = df.set_index(date_col)
+
+        # Sort by date
+        df = df.sort_index()
+
+        # Remove missing values
+        df = df.dropna()
+
+        return df
+
+    def scale_data(self, data, method='minmax'):
+        """Scale the data for neural networks"""
+        if method == 'minmax':
+            self.scaler = MinMaxScaler()
+        elif method == 'standard':
+            self.scaler = StandardScaler()
+
+        scaled_data = self.scaler.fit_transform(data.values.reshape(-1, 1))
+        return scaled_data
+
+    def create_sequences(self, data, seq_length):
+        """Create sequences for ML training"""
+        X, y = [], []
+        for i in range(len(data) - seq_length):
+            X.append(data[i:(i + seq_length)])
+            y.append(data[i + seq_length])
+        return np.array(X), np.array(y)
+
+    def split_data(self, X, y, test_size=0.2):
+        """Split data into train and test sets"""
+        return train_test_split(X, y, test_size=test_size, random_state=42, shuffle=False)
+
+class SimpleForecastingEngine:
+    """Simplified forecasting engine with core ML models only"""
+
+    def __init__(self):
+        self.models = {}
+        self.predictions = {}
+
+    def train_linear_regression(self, X_train, y_train, X_test, y_test):
+        """Train Linear Regression model"""
+        model = LinearRegression()
+        model.fit(X_train, y_train)
+
+        train_pred = model.predict(X_train)
+        test_pred = model.predict(X_test)
+
+        self.models['Linear Regression'] = model
+        self.predictions['Linear Regression'] = {
+            'train': train_pred,
+            'test': test_pred
+        }
+
+        return model, train_pred, test_pred
+
+    def train_random_forest(self, X_train, y_train, X_test, y_test, n_estimators=100):
+        """Train Random Forest model"""
+        model = RandomForestRegressor(n_estimators=n_estimators, random_state=42)
+        model.fit(X_train, y_train)
+
+        train_pred = model.predict(X_train)
+        test_pred = model.predict(X_test)
+
+        self.models['Random Forest'] = model
+        self.predictions['Random Forest'] = {
+            'train': train_pred,
+            'test': test_pred
+        }
+
+        return model, train_pred, test_pred
+
+    def train_neural_network(self, X_train, y_train, X_test, y_test, max_iter=500):
+        """Train Neural Network model using scikit-learn MLPRegressor"""
+        model = MLPRegressor(
+            hidden_layer_sizes=(100, 50),
+            activation='relu',
+            solver='adam',
+            alpha=0.001,
+            learning_rate='adaptive',
+            max_iter=max_iter,
+            random_state=42
+        )
+        model.fit(X_train, y_train)
+
+        train_pred = model.predict(X_train)
+        test_pred = model.predict(X_test)
+
+        self.models['Neural Network'] = model
+        self.predictions['Neural Network'] = {
+            'train': train_pred,
+            'test': test_pred
+        }
+
+        return model, train_pred, test_pred
+
+    def calculate_metrics(self, y_true, y_pred):
+        """Calculate evaluation metrics"""
+        mae = mean_absolute_error(y_true, y_pred)
+        mse = mean_squared_error(y_true, y_pred)
+        rmse = np.sqrt(mse)
+        r2 = r2_score(y_true, y_pred)
+
+        return {
+            'MAE': mae,
+            'MSE': mse,
+            'RMSE': rmse,
+            'R²': r2
+        }
+
+    def forecast_future(self, model_name, steps=30, last_sequence=None):
+        """Make future predictions"""
+        if model_name not in self.models:
+            raise ValueError(f"Model {model_name} not found. Train the model first.")
+
+        model = self.models[model_name]
+
+        if model_name == 'Neural Network':
+            if last_sequence is None:
+                raise ValueError("Last sequence is required for Neural Network forecasting")
+            future_pred = []
+            current_sequence = last_sequence.copy()
+
+            for _ in range(steps):
+                pred = model.predict([current_sequence])
+                future_pred.append(pred[0])
+                # Update sequence for next prediction
+                current_sequence = np.append(current_sequence[1:], pred[0])
+
+            future_pred = np.array(future_pred)
+        else:
+            # For other ML models, create a simple trend-based forecast
+            if last_sequence is None:
+                raise ValueError("Last sequence is required for forecasting")
+
+            # Simple approach: use the last known trend
+            recent_trend = np.mean(np.diff(last_sequence[-5:]))
+            last_value = last_sequence[-1]
+            future_pred = np.array([last_value + (i + 1) * recent_trend for i in range(steps)])
+
+        return future_pred
+
 def main():
-    st.markdown('<h1 class="main-header">📈 Time Series Forecasting Engine</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">🧠 COGNOS 2.0</h1>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align: center; color: #666; font-size: 1.2rem; margin-bottom: 2rem;">Advanced Time Series Forecasting Engine</p>', unsafe_allow_html=True)
 
     # Initialize session state
     if 'data_loaded' not in st.session_state:
@@ -48,10 +224,16 @@ def main():
         st.session_state.models_trained = False
     if 'df' not in st.session_state:
         st.session_state.df = None
+    if 'df_ts' not in st.session_state:
+        st.session_state.df_ts = None
+    if 'date_col' not in st.session_state:
+        st.session_state.date_col = None
+    if 'target_col' not in st.session_state:
+        st.session_state.target_col = None
     if 'processor' not in st.session_state:
         st.session_state.processor = DataProcessor()
     if 'engine' not in st.session_state:
-        st.session_state.engine = ForecastingEngine()
+        st.session_state.engine = SimpleForecastingEngine()
 
     # Sidebar
     with st.sidebar:
@@ -67,6 +249,9 @@ def main():
             for key in st.session_state.keys():
                 del st.session_state[key]
             st.rerun()
+
+        st.markdown("---")
+        st.info("📌 COGNOS 2.0: Ready for deployment!")
 
     # Main content based on selected page
     if page == "Data Upload & Exploration":
@@ -84,53 +269,24 @@ def data_upload_page():
     # Data source selection
     data_source = st.radio(
         "Choose data source:",
-        ["Upload File", "Stock Data (Yahoo Finance)", "Sample Data"]
+        ["Upload File", "Sample Data"]
     )
 
     if data_source == "Upload File":
         uploaded_file = st.file_uploader(
-            "Choose a CSV or Excel file",
-            type=['csv', 'xlsx', 'xls']
+            "Choose a CSV file",
+            type=['csv']
         )
 
         if uploaded_file is not None:
             try:
-                if uploaded_file.name.endswith('.csv'):
-                    df = pd.read_csv(uploaded_file)
-                else:
-                    df = pd.read_excel(uploaded_file)
-
+                df = pd.read_csv(uploaded_file)
                 st.session_state.df = df
                 st.session_state.data_loaded = True
                 st.success("✅ Data loaded successfully!")
 
             except Exception as e:
                 st.error(f"Error loading file: {str(e)}")
-
-    elif data_source == "Stock Data (Yahoo Finance)":
-        col1, col2 = st.columns(2)
-
-        with col1:
-            symbol = st.text_input("Stock Symbol", value="AAPL")
-            start_date = st.date_input("Start Date", value=datetime.now() - timedelta(days=365*2))
-
-        with col2:
-            period = st.selectbox("Period", ["1y", "2y", "5y", "max"])
-            end_date = st.date_input("End Date", value=datetime.now())
-
-        if st.button("📊 Fetch Stock Data"):
-            try:
-                with st.spinner("Fetching data..."):
-                    ticker = yf.Ticker(symbol)
-                    df = ticker.history(start=start_date, end=end_date)
-                    df.reset_index(inplace=True)
-
-                st.session_state.df = df
-                st.session_state.data_loaded = True
-                st.success(f"✅ Stock data for {symbol} loaded successfully!")
-
-            except Exception as e:
-                st.error(f"Error fetching stock data: {str(e)}")
 
     elif data_source == "Sample Data":
         sample_type = st.selectbox(
@@ -221,22 +377,23 @@ def model_training_page():
         st.warning("⚠️ Please load data first in the 'Data Upload & Exploration' page.")
         return
 
+    if st.session_state.df_ts is None:
+        st.warning("⚠️ Please configure your time series first by going to 'Data Upload & Exploration' and clicking '📈 Visualize Time Series'.")
+        return
+
     # Model selection
     st.subheader("🎯 Select Models to Train")
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.write("**Traditional ML Models:**")
+        st.write("**Available ML Models:**")
         train_lr = st.checkbox("Linear Regression")
         train_rf = st.checkbox("Random Forest")
-        train_xgb = st.checkbox("XGBoost")
+        train_nn = st.checkbox("Neural Network (MLP)")
 
     with col2:
-        st.write("**Time Series Models:**")
-        train_arima = st.checkbox("ARIMA")
-        train_prophet = st.checkbox("Prophet")
-        train_nn = st.checkbox("Neural Network (MLP)")
+        st.info("💡 **COGNOS 2.0**\n\nAdvanced forecasting with 3 robust ML algorithms optimized for time series data.")
 
     # Training parameters
     st.subheader("⚙️ Training Parameters")
@@ -245,10 +402,10 @@ def model_training_page():
 
     with col1:
         test_size = st.slider("Test Size (%)", 10, 40, 20) / 100
-        sequence_length = st.number_input("Sequence Length (for ML models)", 5, 50, 10)
+        sequence_length = st.number_input("Sequence Length", 5, 50, 10)
 
     with col2:
-        nn_epochs = st.number_input("Neural Network Max Iterations", 100, 1000, 500)
+        nn_max_iter = st.number_input("Neural Network Max Iterations", 100, 1000, 300)
         rf_estimators = st.number_input("Random Forest Trees", 50, 500, 100)
 
     with col3:
@@ -256,15 +413,15 @@ def model_training_page():
 
     # Train models
     if st.button("🚀 Train Selected Models"):
-        if not any([train_lr, train_rf, train_xgb, train_arima, train_prophet, train_nn]):
+        if not any([train_lr, train_rf, train_nn]):
             st.error("Please select at least one model to train.")
             return
 
         with st.spinner("Training models..."):
             try:
                 train_models(
-                    train_lr, train_rf, train_xgb, train_arima, train_prophet, train_nn,
-                    test_size, sequence_length, nn_epochs, rf_estimators, scaling_method
+                    train_lr, train_rf, train_nn,
+                    test_size, sequence_length, nn_max_iter, rf_estimators, scaling_method
                 )
                 st.session_state.models_trained = True
                 st.success("✅ Models trained successfully!")
@@ -276,60 +433,48 @@ def model_training_page():
     if st.session_state.models_trained:
         display_training_results()
 
-def train_models(train_lr, train_rf, train_xgb, train_arima, train_prophet, train_nn,
-                test_size, sequence_length, nn_epochs, rf_estimators, scaling_method):
+def train_models(train_lr, train_rf, train_nn, test_size, sequence_length, nn_max_iter, rf_estimators, scaling_method):
+    try:
+        df_ts = st.session_state.df_ts
+        target_col = st.session_state.target_col
+        engine = st.session_state.engine
+        processor = st.session_state.processor
 
-    df_ts = st.session_state.df_ts
-    target_col = st.session_state.target_col
-    engine = st.session_state.engine
-    processor = st.session_state.processor
+        # Prepare data
+        data = df_ts[target_col].values
 
-    # Prepare data for different model types
-    data = df_ts[target_col].values
-
-    # For ML models (need feature engineering)
-    if train_lr or train_rf or train_xgb or train_nn:
         # Create lag features
         X, y = processor.create_sequences(data, sequence_length)
 
-        if train_nn:
-            # Scale data for Neural Network
-            scaled_data = processor.scale_data(pd.Series(data), scaling_method)
-            X_scaled, y_scaled = processor.create_sequences(scaled_data.flatten(), sequence_length)
-            X_train_nn, X_test_nn, y_train_nn, y_test_nn = processor.split_data(
-                X_scaled, y_scaled, test_size
-            )
+        if len(X) == 0:
+            raise ValueError("Not enough data to create sequences. Try reducing sequence length.")
 
-        # Split for other ML models
+        # Split data
         X_train, X_test, y_train, y_test = processor.split_data(X, y, test_size)
 
-        # Train ML models
+        # Train models
         if train_lr:
             engine.train_linear_regression(X_train, y_train, X_test, y_test)
 
         if train_rf:
             engine.train_random_forest(X_train, y_train, X_test, y_test, rf_estimators)
 
-        if train_xgb:
-            engine.train_xgboost(X_train, y_train, X_test, y_test)
-
         if train_nn:
-            engine.train_neural_network(X_train_nn, y_train_nn, X_test_nn, y_test_nn, nn_epochs)
+            # Scale data for Neural Network
+            scaled_data = processor.scale_data(pd.Series(data), scaling_method)
+            X_scaled, y_scaled = processor.create_sequences(scaled_data.flatten(), sequence_length)
+            X_train_nn, X_test_nn, y_train_nn, y_test_nn = processor.split_data(X_scaled, y_scaled, test_size)
+            engine.train_neural_network(X_train_nn, y_train_nn, X_test_nn, y_test_nn, nn_max_iter)
 
-    # For time series models
-    if train_arima:
-        engine.train_arima(data, test_size)
-
-    if train_prophet:
-        df_prophet = df_ts.reset_index()
-        engine.train_prophet(df_prophet, df_prophet.columns[0], target_col, test_size)
-
-    # Store split data for evaluation
-    if 'X_train' in locals():
+        # Store split data for evaluation
         st.session_state.X_train = X_train
         st.session_state.X_test = X_test
         st.session_state.y_train = y_train
         st.session_state.y_test = y_test
+
+    except Exception as e:
+        st.error(f"Training failed: {str(e)}")
+        raise e
 
 def display_training_results():
     st.subheader("📈 Training Results")
@@ -339,47 +484,31 @@ def display_training_results():
         y_train = st.session_state.y_train
         y_test = st.session_state.y_test
 
-        # For time series models, we need to handle differently
-        results = {}
-
+        # Display metrics table
+        metrics_df = []
         for model_name, predictions in st.session_state.engine.predictions.items():
             train_pred = predictions['train']
             test_pred = predictions['test']
 
             # Adjust lengths if necessary
-            if len(train_pred) != len(y_train):
-                min_len = min(len(train_pred), len(y_train))
-                train_pred = train_pred[:min_len]
-                y_train_adj = y_train[:min_len]
-            else:
-                y_train_adj = y_train
+            min_train_len = min(len(train_pred), len(y_train))
+            min_test_len = min(len(test_pred), len(y_test))
 
-            if len(test_pred) != len(y_test):
-                min_len = min(len(test_pred), len(y_test))
-                test_pred = test_pred[:min_len]
-                y_test_adj = y_test[:min_len]
-            else:
-                y_test_adj = y_test
+            train_metrics = st.session_state.engine.calculate_metrics(
+                y_train[:min_train_len], train_pred[:min_train_len]
+            )
+            test_metrics = st.session_state.engine.calculate_metrics(
+                y_test[:min_test_len], test_pred[:min_test_len]
+            )
 
-            train_metrics = st.session_state.engine.calculate_metrics(y_train_adj, train_pred)
-            test_metrics = st.session_state.engine.calculate_metrics(y_test_adj, test_pred)
-
-            results[model_name] = {
-                'train_metrics': train_metrics,
-                'test_metrics': test_metrics
-            }
-
-        # Display metrics table
-        metrics_df = []
-        for model_name, metrics in results.items():
             row = {
                 'Model': model_name,
-                'Train MAE': f"{metrics['train_metrics']['MAE']:.4f}",
-                'Train RMSE': f"{metrics['train_metrics']['RMSE']:.4f}",
-                'Train R²': f"{metrics['train_metrics']['R²']:.4f}",
-                'Test MAE': f"{metrics['test_metrics']['MAE']:.4f}",
-                'Test RMSE': f"{metrics['test_metrics']['RMSE']:.4f}",
-                'Test R²': f"{metrics['test_metrics']['R²']:.4f}"
+                'Train MAE': f"{train_metrics['MAE']:.4f}",
+                'Train RMSE': f"{train_metrics['RMSE']:.4f}",
+                'Train R²': f"{train_metrics['R²']:.4f}",
+                'Test MAE': f"{test_metrics['MAE']:.4f}",
+                'Test RMSE': f"{test_metrics['RMSE']:.4f}",
+                'Test R²': f"{test_metrics['R²']:.4f}"
             }
             metrics_df.append(row)
 
@@ -404,14 +533,14 @@ def forecasting_page():
         forecast_steps = st.number_input("Forecast Steps", 1, 365, 30)
 
     with col2:
-        confidence_interval = st.slider("Confidence Interval (%)", 80, 99, 95)
+        st.info("💡 Generate future predictions using your trained models")
 
     if st.button("🔮 Generate Forecast"):
         try:
             with st.spinner("Generating forecast..."):
-                # Get last sequence for Neural Network if needed
+                # Get last sequence for forecasting
                 last_sequence = None
-                if selected_model == 'Neural Network' and hasattr(st.session_state, 'X_test'):
+                if hasattr(st.session_state, 'X_test'):
                     last_sequence = st.session_state.X_test[-1]
 
                 forecast = st.session_state.engine.forecast_future(
@@ -436,10 +565,11 @@ def create_forecast_plot(forecast, model_name):
     # Create plot
     fig = go.Figure()
 
-    # Historical data
+    # Historical data (show last 100 points for clarity)
+    recent_data = df_ts.tail(100)
     fig.add_trace(go.Scatter(
-        x=df_ts.index,
-        y=df_ts[target_col],
+        x=recent_data.index,
+        y=recent_data[target_col],
         mode='lines',
         name='Historical',
         line=dict(color='#1f77b4', width=2)
@@ -455,7 +585,7 @@ def create_forecast_plot(forecast, model_name):
     ))
 
     fig.update_layout(
-        title=f"Forecast using {model_name}",
+        title=f"COGNOS 2.0 Forecast using {model_name}",
         xaxis_title="Date",
         yaxis_title=target_col,
         hovermode='x unified'
@@ -479,10 +609,6 @@ def model_comparison_page():
         st.warning("⚠️ Please train models first in the 'Model Training' page.")
         return
 
-    # Create comparison charts
-    create_model_comparison_charts()
-
-def create_model_comparison_charts():
     # Get predictions from all models
     predictions = st.session_state.engine.predictions
 
@@ -490,21 +616,23 @@ def create_model_comparison_charts():
         st.warning("No predictions available for comparison.")
         return
 
-    # Create subplot for test predictions comparison
-    fig = make_subplots(
-        rows=2, cols=2,
-        subplot_titles=('Test Predictions vs Actual', 'Model Performance (RMSE)',
-                       'Model Performance (MAE)', 'Model Performance (R²)'),
-        specs=[[{"secondary_y": False}, {"secondary_y": False}],
-               [{"secondary_y": False}, {"secondary_y": False}]]
-    )
-
-    # Get actual test values
+    # Create comparison visualization
     if hasattr(st.session_state, 'y_test'):
         y_test = st.session_state.y_test
 
-        # Plot actual vs predicted for each model
-        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
+        fig = go.Figure()
+
+        # Plot actual values
+        fig.add_trace(go.Scatter(
+            x=list(range(len(y_test))),
+            y=y_test,
+            mode='lines',
+            name='Actual',
+            line=dict(color='black', width=3)
+        ))
+
+        # Plot predictions from each model
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c']
 
         for i, (model_name, preds) in enumerate(predictions.items()):
             test_pred = preds['test']
@@ -513,30 +641,22 @@ def create_model_comparison_charts():
             # Adjust length if necessary
             min_len = min(len(test_pred), len(y_test))
 
-            fig.add_trace(
-                go.Scatter(
-                    x=list(range(min_len)),
-                    y=test_pred[:min_len],
-                    mode='lines',
-                    name=f'{model_name} Pred',
-                    line=dict(color=color)
-                ),
-                row=1, col=1
-            )
-
-        # Add actual values
-        fig.add_trace(
-            go.Scatter(
-                x=list(range(len(y_test))),
-                y=y_test,
+            fig.add_trace(go.Scatter(
+                x=list(range(min_len)),
+                y=test_pred[:min_len],
                 mode='lines',
-                name='Actual',
-                line=dict(color='black', width=3)
-            ),
-            row=1, col=1
+                name=f'{model_name}',
+                line=dict(color=color, width=2)
+            ))
+
+        fig.update_layout(
+            title="COGNOS 2.0 - Model Predictions vs Actual Values",
+            xaxis_title="Time Steps",
+            yaxis_title="Values",
+            hovermode='x unified'
         )
 
-    st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True)
 
 def generate_sample_data(sample_type):
     """Generate sample time series data"""
