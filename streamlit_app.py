@@ -14,15 +14,15 @@ warnings.filterwarnings('ignore')
 
 # Page configuration
 st.set_page_config(
-    page_title="COGNOS 2.0 - AI Time Series Forecasting",
+    page_title="COGNOS 2.1 - AI Time Series Forecasting",
     page_icon="🧠",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
-        'Get Help': 'https://github.com/yourusername/cognos-2.0',
-        'Report a bug': 'https://github.com/yourusername/cognos-2.0/issues',
+        'Get Help': 'https://github.com/yourusername/cognos-2.1',
+        'Report a bug': 'https://github.com/yourusername/cognos-2.1/issues',
         'About': """
-        # COGNOS 2.0
+        # COGNOS 2.1
         AI-Powered Time Series Forecasting Engine
         
         Automatically finds the best model for your data!
@@ -312,7 +312,7 @@ class AutoMLForecastingEngine:
         return future_pred
 
 def main():
-    st.markdown('<h1 class="main-header">🧠 COGNOS 2.0</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">🧠 COGNOS 2.1</h1>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">AI-Powered Time Series Forecasting • Automatically Finds the Best Model</div>', unsafe_allow_html=True)
 
     # Initialize session state
@@ -327,7 +327,7 @@ def main():
 
     # Sidebar
     with st.sidebar:
-        st.header("🧠 COGNOS 2.0")
+        st.header("🧠 COGNOS 2.1")
         st.info("**AI-Powered Forecasting**\n\nJust upload your data, select columns, and let AI find the best model automatically!")
 
         st.markdown("---")
@@ -573,7 +573,7 @@ def display_forecast_results():
     )
 
     fig.update_layout(
-        title=f"🧠 COGNOS 2.0 - AI Forecast for {target_col}",
+        title=f"🧠 COGNOS 2.1 - AI Forecast for {target_col}",
         xaxis_title="📅 Date",
         yaxis_title=f"📊 {target_col}",
         hovermode='x unified',
