@@ -18,7 +18,7 @@ warnings.filterwarnings('ignore')
 
 # Page configuration
 st.set_page_config(
-    page_title="COGNOS 2.1 - AI Time Series Forecasting",
+    page_title="COGNOS 2.1 - Smart Time Series Forecasting",
     page_icon="🧠",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -27,7 +27,7 @@ st.set_page_config(
         'Report a bug': 'https://github.com/yourusername/cognos-2.1/issues',
         'About': """
         # COGNOS 2.1
-        AI-Powered Time Series Forecasting Engine
+        Smart Time Series Forecasting Engine
         
         Automatically finds the best model for your data!
         Built with ❤️ using Streamlit and Advanced Time Series Models
@@ -515,7 +515,7 @@ class AutoMLForecastingEngine:
 
 def main():
     st.markdown('<h1 class="main-header">🧠 COGNOS 2.1</h1>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">AI-Powered Time Series Forecasting • Automatically Finds the Best Model</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">Smart Time Series Forecasting • Automatically Finds the Best Model</div>', unsafe_allow_html=True)
 
     # Initialize session state
     if 'data_loaded' not in st.session_state:
@@ -530,7 +530,7 @@ def main():
     # Sidebar
     with st.sidebar:
         st.header("🧠 COGNOS 2.1")
-        st.info("**AI-Powered Forecasting**\n\nJust upload your data, select columns, and let AI find the best model automatically!")
+        st.info("**Smart Forecasting**\n\nJust upload your data, select columns, and let Smart algorithms find the best model automatically!")
 
         st.markdown("---")
 
@@ -546,7 +546,7 @@ def main():
         1. 📁 Upload your time series data
         2. 🎯 Select date & value columns  
         3. 🚀 Click "Generate Forecast"
-        4. ✨ Get instant AI-powered predictions!
+        4. ✨ Get instant Smart predictions!
         """)
 
     # Main content
@@ -654,7 +654,7 @@ def data_upload_and_forecast():
         if date_col and target_col:
             st.markdown("---")
             st.markdown('<div class="forecast-section">', unsafe_allow_html=True)
-            st.subheader("🔮 AI Forecasting")
+            st.subheader("🔮 Smart Forecasting")
 
             col1, col2, col3 = st.columns([2, 1, 1])
 
@@ -666,7 +666,7 @@ def data_upload_and_forecast():
                 )
 
             with col2:
-                st.markdown("### AI will automatically:")
+                st.markdown("### Smart Engine will automatically:")
                 st.markdown("• Test multiple models")
                 st.markdown("• Optimize parameters")
                 st.markdown("• Select best performer")
@@ -681,9 +681,9 @@ def data_upload_and_forecast():
                 st.markdown("• 📈 AutoRegression")
 
             # Big forecast button
-            if st.button("🚀 Generate AI Forecast", type="primary", use_container_width=True):
+            if st.button("🚀 Generate Smart Forecast", type="primary", use_container_width=True):
                 try:
-                    with st.spinner("🤖 AI is analyzing your data and finding the best model..."):
+                    with st.spinner("🤖 Smart Engine is analyzing your data and finding the best model..."):
 
                         # Generate forecast using AutoML
                         best_config, forecast, df_ts = st.session_state.engine.auto_forecast(
@@ -732,7 +732,7 @@ def display_forecast_results():
             <li>MAE: {best_config['metrics']['mae']:.4f}</li>
             <li>R² Score: {best_config['metrics']['r2']:.4f}</li>
         </ul>
-        <p><em>AI automatically tested multiple models and selected this one for optimal performance!</em></p>
+        <p><em>Smart Engine automatically tested multiple models and selected this one for optimal performance!</em></p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -765,7 +765,7 @@ def display_forecast_results():
         x=future_dates,
         y=forecast,
         mode='lines',
-        name=f'🔮 AI Forecast ({best_config["model_name"]})',
+        name=f'🔮 Smart Forecast ({best_config["model_name"]})',
         line=dict(color='#ff6b6b', width=3, dash='dot')
     ))
 
@@ -799,7 +799,7 @@ def display_forecast_results():
     )
 
     fig.update_layout(
-        title=f"🧠 COGNOS 2.1 - AI Forecast for {target_col}",
+        title=f"🧠 COGNOS 2.1 - Smart Forecast for {target_col}",
         xaxis_title="📅 Date",
         yaxis_title=f"📊 {target_col}",
         hovermode='x unified',
