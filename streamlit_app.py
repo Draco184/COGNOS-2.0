@@ -9,6 +9,10 @@ from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
+from statsmodels.tsa.arima.model import ARIMA
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+from statsmodels.tsa.ar_model import AutoReg
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -26,7 +30,7 @@ st.set_page_config(
         AI-Powered Time Series Forecasting Engine
         
         Automatically finds the best model for your data!
-        Built with ❤️ using Streamlit and scikit-learn
+        Built with ❤️ using Streamlit and Advanced Time Series Models
         """
     }
 )
@@ -127,6 +131,110 @@ class AutoMLForecastingEngine:
         except Exception as e:
             return None
 
+    def train_time_series_model(self, data, model_name, test_size=0.2, forecast_steps=30):
+        """Train time series specific models (SES, Holt-Winters, ARIMA, SARIMA, AutoReg)"""
+        try:
+            split_point = int(len(data) * (1 - test_size))
+            train_data = data[:split_point]
+            test_data = data[split_point:]
+
+            if len(train_data) < 10 or len(test_data) < 5:
+                return None
+
+            model = None
+            forecast = None
+
+            if model_name == 'SES':
+                # Simple Exponential Smoothing
+                model = ExponentialSmoothing(train_data, trend=None, seasonal=None)
+                fitted_model = model.fit()
+                forecast = fitted_model.forecast(len(test_data))
+
+            elif model_name == 'Holt Linear':
+                # Double Exponential Smoothing (Additive)
+                model = ExponentialSmoothing(train_data, trend='add', seasonal=None)
+                fitted_model = model.fit()
+                forecast = fitted_model.forecast(len(test_data))
+
+            elif model_name == 'Holt-Winters Additive':
+                # Triple Exponential Smoothing (Additive)
+                if len(train_data) >= 24:  # Need at least 2 seasons
+                    seasonal_periods = min(12, len(train_data) // 3)
+                    model = ExponentialSmoothing(train_data, trend='add', seasonal='add',
+                                               seasonal_periods=seasonal_periods)
+                    fitted_model = model.fit()
+                    forecast = fitted_model.forecast(len(test_data))
+                else:
+                    return None
+
+            elif model_name == 'Holt-Winters Multiplicative':
+                # Triple Exponential Smoothing (Multiplicative)
+                if len(train_data) >= 24 and np.all(train_data > 0):  # Need positive values
+                    seasonal_periods = min(12, len(train_data) // 3)
+                    model = ExponentialSmoothing(train_data, trend='add', seasonal='mul',
+                                               seasonal_periods=seasonal_periods)
+                    fitted_model = model.fit()
+                    forecast = fitted_model.forecast(len(test_data))
+                else:
+                    return None
+
+            elif model_name == 'AutoRegression':
+                # AutoRegression model
+                if len(train_data) >= 20:
+                    max_lags = min(10, len(train_data) // 4)
+                    model = AutoReg(train_data, lags=max_lags)
+                    fitted_model = model.fit()
+                    forecast = fitted_model.forecast(len(test_data))
+                else:
+                    return None
+
+            elif model_name == 'ARIMA':
+                # Auto ARIMA
+                try:
+                    model = ARIMA(train_data, order=(1, 1, 1))
+                    fitted_model = model.fit()
+                    forecast = fitted_model.forecast(len(test_data))
+                except:
+                    # Fallback to simpler ARIMA
+                    model = ARIMA(train_data, order=(1, 0, 1))
+                    fitted_model = model.fit()
+                    forecast = fitted_model.forecast(len(test_data))
+
+            elif model_name == 'SARIMA':
+                # Seasonal ARIMA
+                if len(train_data) >= 48:  # Need enough data for seasonal
+                    try:
+                        seasonal_periods = min(12, len(train_data) // 4)
+                        model = SARIMAX(train_data, order=(1, 1, 1),
+                                       seasonal_order=(1, 1, 1, seasonal_periods))
+                        fitted_model = model.fit(disp=False)
+                        forecast = fitted_model.forecast(len(test_data))
+                    except:
+                        return None
+                else:
+                    return None
+
+            if forecast is not None:
+                rmse = np.sqrt(mean_squared_error(test_data, forecast))
+                mae = mean_absolute_error(test_data, forecast)
+                r2 = r2_score(test_data, forecast) if len(np.unique(test_data)) > 1 else 0
+
+                return {
+                    'model': fitted_model,
+                    'model_name': model_name,
+                    'rmse': rmse,
+                    'mae': mae,
+                    'r2': r2,
+                    'forecast': forecast,
+                    'train_data': train_data,
+                    'test_data': test_data
+                }
+
+        except Exception as e:
+            return None
+
+        return None
+
     def auto_forecast(self, df, date_col, target_col, forecast_steps=30):
         """Automatically find the best model and generate forecasts"""
 
@@ -135,7 +243,7 @@ class AutoMLForecastingEngine:
 
         # Step 1: Data Preparation
         status_text.text('🔄 Preparing data...')
-        progress_bar.progress(10)
+        progress_bar.progress(5)
 
         df_ts = self.prepare_data(df, date_col, target_col)
         data = df_ts[target_col].values
@@ -143,25 +251,23 @@ class AutoMLForecastingEngine:
         if len(data) < 20:
             raise ValueError("Need at least 20 data points for forecasting")
 
-        # Step 2: Test different configurations
-        status_text.text('🔍 Testing different model configurations...')
-        progress_bar.progress(30)
+        # Step 2: Test ML Models
+        status_text.text('🤖 Testing Machine Learning models...')
+        progress_bar.progress(15)
 
         best_config = None
         best_rmse = float('inf')
-        results = []
 
-        # Test different sequence lengths and models
+        # Test ML models with sequences
         sequence_lengths = [5, 10, 15] if len(data) > 50 else [5]
         test_sizes = [0.2, 0.3]
 
         config_count = 0
-        total_configs = len(sequence_lengths) * len(test_sizes) * 3  # 3 models
+        total_ml_configs = len(sequence_lengths) * len(test_sizes) * 3  # 3 ML models
 
         for seq_len in sequence_lengths:
             for test_size in test_sizes:
                 try:
-                    # Create sequences
                     X, y = self.create_sequences(data, seq_len)
                     if len(X) < 10:
                         continue
@@ -172,7 +278,7 @@ class AutoMLForecastingEngine:
 
                     # Test Linear Regression
                     config_count += 1
-                    progress_bar.progress(30 + (config_count / total_configs) * 40)
+                    progress_bar.progress(15 + (config_count / total_ml_configs) * 20)
 
                     lr_result = self.train_and_evaluate_model(
                         LinearRegression(), 'Linear Regression',
@@ -189,12 +295,13 @@ class AutoMLForecastingEngine:
                             'metrics': lr_result,
                             'X_train': X_train, 'X_test': X_test,
                             'y_train': y_train, 'y_test': y_test,
-                            'scaler': None
+                            'scaler': None,
+                            'model_type': 'ML'
                         }
 
                     # Test Random Forest
                     config_count += 1
-                    progress_bar.progress(30 + (config_count / total_configs) * 40)
+                    progress_bar.progress(15 + (config_count / total_ml_configs) * 20)
 
                     rf_result = self.train_and_evaluate_model(
                         RandomForestRegressor(n_estimators=50, random_state=42), 'Random Forest',
@@ -211,12 +318,13 @@ class AutoMLForecastingEngine:
                             'metrics': rf_result,
                             'X_train': X_train, 'X_test': X_test,
                             'y_train': y_train, 'y_test': y_test,
-                            'scaler': None
+                            'scaler': None,
+                            'model_type': 'ML'
                         }
 
-                    # Test Neural Network (scaled data)
+                    # Test Neural Network
                     config_count += 1
-                    progress_bar.progress(30 + (config_count / total_configs) * 40)
+                    progress_bar.progress(15 + (config_count / total_ml_configs) * 20)
 
                     scaled_data, scaler = self.scale_data(pd.Series(data))
                     X_scaled, y_scaled = self.create_sequences(scaled_data.flatten(), seq_len)
@@ -242,22 +350,53 @@ class AutoMLForecastingEngine:
                                 'X_train': X_train_nn, 'X_test': X_test_nn,
                                 'y_train': y_train_nn, 'y_test': y_test_nn,
                                 'scaler': scaler,
-                                'original_data': data
+                                'original_data': data,
+                                'model_type': 'ML'
                             }
 
                 except Exception as e:
                     continue
 
+        # Step 3: Test Time Series Models
+        status_text.text('📊 Testing Time Series models...')
+        progress_bar.progress(40)
+
+        ts_models = ['SES', 'Holt Linear', 'Holt-Winters Additive', 'Holt-Winters Multiplicative',
+                     'AutoRegression', 'ARIMA', 'SARIMA']
+
+        for i, model_name in enumerate(ts_models):
+            progress_bar.progress(40 + (i / len(ts_models)) * 35)
+
+            for test_size in [0.2, 0.3]:
+                ts_result = self.train_time_series_model(data, model_name, test_size, forecast_steps)
+
+                if ts_result and ts_result['rmse'] < best_rmse:
+                    best_rmse = ts_result['rmse']
+                    best_config = {
+                        'model_name': ts_result['model_name'],
+                        'model': ts_result['model'],
+                        'test_size': test_size,
+                        'metrics': {
+                            'rmse': ts_result['rmse'],
+                            'mae': ts_result['mae'],
+                            'r2': ts_result['r2']
+                        },
+                        'train_data': ts_result['train_data'],
+                        'test_data': ts_result['test_data'],
+                        'original_data': data,
+                        'model_type': 'TS'
+                    }
+
         if best_config is None:
             raise ValueError("Could not find a suitable model configuration")
 
-        # Step 3: Generate forecasts
+        # Step 4: Generate forecasts
         status_text.text('🎯 Generating forecasts with best model...')
         progress_bar.progress(80)
 
         forecast = self.generate_forecast(best_config, forecast_steps)
 
-        # Step 4: Complete
+        # Step 5: Complete
         status_text.text('✅ Forecasting complete!')
         progress_bar.progress(100)
 
@@ -273,12 +412,29 @@ class AutoMLForecastingEngine:
         """Generate future forecasts using the best model"""
         model = config['model']
         model_name = config['model_name']
-        seq_len = config['seq_len']
+        model_type = config.get('model_type', 'ML')
 
-        if model_name == 'Neural Network':
+        if model_type == 'TS':
+            # Time Series models - use direct forecasting
+            try:
+                future_pred = model.forecast(steps)
+                return future_pred
+            except:
+                # Fallback for some models
+                original_data = config.get('original_data', [])
+                if len(original_data) > 10:
+                    recent_trend = np.mean(np.diff(original_data[-10:]))
+                    last_value = original_data[-1]
+                    future_pred = np.array([last_value + (i + 1) * recent_trend for i in range(steps)])
+                    return future_pred
+                else:
+                    return np.array([100] * steps)  # Fallback
+
+        elif model_name == 'Neural Network':
             # Use scaled data for neural network
             scaler = config['scaler']
             original_data = config['original_data']
+            seq_len = config['seq_len']
             scaled_data, _ = self.scale_data(pd.Series(original_data))
 
             # Get last sequence
@@ -293,10 +449,11 @@ class AutoMLForecastingEngine:
             # Inverse transform predictions
             future_pred = np.array(future_pred).reshape(-1, 1)
             future_pred = scaler.inverse_transform(future_pred).flatten()
+            return future_pred
 
         else:
-            # For other models, use trend-based forecasting
-            X_test = config['X_test']
+            # For other ML models, use trend-based forecasting
+            X_test = config.get('X_test', [])
             if len(X_test) > 0:
                 last_sequence = X_test[-1]
                 recent_trend = np.mean(np.diff(last_sequence[-5:]))
@@ -304,12 +461,15 @@ class AutoMLForecastingEngine:
                 future_pred = np.array([last_value + (i + 1) * recent_trend for i in range(steps)])
             else:
                 # Fallback: simple trend from original data
-                recent_data = config['original_data'][-10:] if 'original_data' in config else [100]
-                trend = np.mean(np.diff(recent_data)) if len(recent_data) > 1 else 0
-                last_value = recent_data[-1]
-                future_pred = np.array([last_value + (i + 1) * trend for i in range(steps)])
+                original_data = config.get('original_data', [])
+                if len(original_data) > 1:
+                    trend = np.mean(np.diff(original_data[-10:]))
+                    last_value = original_data[-1]
+                    future_pred = np.array([last_value + (i + 1) * trend for i in range(steps)])
+                else:
+                    future_pred = np.array([100] * steps)  # Fallback
 
-        return future_pred
+            return future_pred
 
 def main():
     st.markdown('<h1 class="main-header">🧠 COGNOS 2.1</h1>', unsafe_allow_html=True)
@@ -322,8 +482,8 @@ def main():
         st.session_state.forecast_generated = False
     if 'df' not in st.session_state:
         st.session_state.df = None
-    if 'engine' not in st.session_state:
-        st.session_state.engine = AutoMLForecastingEngine()
+    # Force reset the engine to use the new AutoMLForecastingEngine
+    st.session_state.engine = AutoMLForecastingEngine()
 
     # Sidebar
     with st.sidebar:
@@ -474,6 +634,9 @@ def data_upload_and_forecast():
                 st.markdown("• 📈 Linear Regression")
                 st.markdown("• 🌲 Random Forest")
                 st.markdown("• 🧠 Neural Network")
+                st.markdown("• 📊 SES & Holt Models")
+                st.markdown("• 🔄 ARIMA & SARIMA")
+                st.markdown("• 📈 AutoRegression")
 
             # Big forecast button
             if st.button("🚀 Generate AI Forecast", type="primary", use_container_width=True):

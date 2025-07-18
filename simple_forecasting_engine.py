@@ -132,3 +132,108 @@ class SimpleForecastingEngine:
             future_pred = np.array([last_value + (i + 1) * recent_trend for i in range(steps)])
 
         return future_pred
+
+    def prepare_data(self, df, date_col, target_col):
+        """Prepare data for time series analysis"""
+        # Convert date column to datetime
+        df = df.copy()
+        df[date_col] = pd.to_datetime(df[date_col])
+
+        # Set date as index and sort
+        df = df.set_index(date_col).sort_index()
+
+        # Remove missing values
+        df = df.dropna()
+
+        return df
+
+    def create_sequences(self, data, seq_length):
+        """Create sequences for ML training"""
+        X, y = [], []
+        for i in range(len(data) - seq_length):
+            X.append(data[i:(i + seq_length)])
+            y.append(data[i + seq_length])
+        return np.array(X), np.array(y)
+
+    def auto_forecast(self, df, date_col, target_col, forecast_steps=30):
+        """Automatically find the best model and generate forecasts"""
+        import streamlit as st
+
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+
+        # Step 1: Data Preparation
+        status_text.text('🔄 Preparing data...')
+        progress_bar.progress(10)
+
+        df_ts = self.prepare_data(df, date_col, target_col)
+        data = df_ts[target_col].values
+
+        if len(data) < 20:
+            raise ValueError("Need at least 20 data points for forecasting")
+
+        # Step 2: Create sequences
+        status_text.text('🔢 Creating training sequences...')
+        progress_bar.progress(25)
+
+        seq_length = min(10, len(data) // 4)
+        X, y = self.create_sequences(data, seq_length)
+
+        if len(X) < 10:
+            raise ValueError("Not enough data for sequence creation")
+
+        # Split data
+        split_point = int(len(X) * 0.8)
+        X_train, X_test = X[:split_point], X[split_point:]
+        y_train, y_test = y[:split_point], y[split_point:]
+
+        # Step 3: Train models
+        status_text.text('🤖 Training Linear Regression...')
+        progress_bar.progress(40)
+        self.train_linear_regression(X_train, y_train, X_test, y_test)
+
+        status_text.text('🌲 Training Random Forest...')
+        progress_bar.progress(60)
+        self.train_random_forest(X_train, y_train, X_test, y_test)
+
+        status_text.text('🧠 Training Neural Network...')
+        progress_bar.progress(80)
+        self.train_neural_network(X_train, y_train, X_test, y_test)
+
+        # Step 4: Evaluate models
+        status_text.text('📊 Evaluating models...')
+        progress_bar.progress(90)
+
+        results = self.evaluate_models(y_train, y_test)
+
+        # Find best model based on test RMSE
+        best_model_name = min(results.keys(),
+                            key=lambda x: results[x]['test_metrics']['RMSE'])
+
+        # Step 5: Generate forecast
+        status_text.text('🔮 Generating forecast...')
+        progress_bar.progress(95)
+
+        last_sequence = data[-seq_length:]
+        forecast = self.forecast_future(best_model_name, forecast_steps, last_sequence)
+
+        # Create best config for compatibility
+        best_config = {
+            'model_name': best_model_name,
+            'model': self.models[best_model_name],
+            'metrics': results[best_model_name]['test_metrics'],
+            'seq_len': seq_length,
+            'model_type': 'ML'
+        }
+
+        status_text.text('✅ Forecasting complete!')
+        progress_bar.progress(100)
+
+        # Clean up progress indicators
+        import time
+        time.sleep(1)
+        progress_bar.empty()
+        status_text.empty()
+
+        return best_config, forecast, df_ts
+
