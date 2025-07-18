@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
+from datetime import datetime
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
@@ -133,6 +133,9 @@ class AutoMLForecastingEngine:
 
     def train_time_series_model(self, data, model_name, test_size=0.2, forecast_steps=30):
         """Train time series specific models (SES, Holt-Winters, ARIMA, SARIMA, AutoReg)"""
+        fitted_model = None  # Initialize at the start
+        forecast = None
+
         try:
             split_point = int(len(data) * (1 - test_size))
             train_data = data[:split_point]
@@ -141,64 +144,85 @@ class AutoMLForecastingEngine:
             if len(train_data) < 10 or len(test_data) < 5:
                 return None
 
-            model = None
-            forecast = None
-
             if model_name == 'SES':
                 # Simple Exponential Smoothing
-                model = ExponentialSmoothing(train_data, trend=None, seasonal=None)
-                fitted_model = model.fit()
-                forecast = fitted_model.forecast(len(test_data))
+                try:
+                    model = ExponentialSmoothing(train_data, trend=None, seasonal=None)
+                    fitted_model = model.fit()
+                    forecast = fitted_model.forecast(len(test_data))
+                except:
+                    return None
 
             elif model_name == 'Holt Linear':
                 # Double Exponential Smoothing (Additive)
-                model = ExponentialSmoothing(train_data, trend='add', seasonal=None)
-                fitted_model = model.fit()
-                forecast = fitted_model.forecast(len(test_data))
+                try:
+                    model = ExponentialSmoothing(train_data, trend='add', seasonal=None)
+                    fitted_model = model.fit()
+                    forecast = fitted_model.forecast(len(test_data))
+                except:
+                    return None
 
             elif model_name == 'Holt-Winters Additive':
                 # Triple Exponential Smoothing (Additive)
                 if len(train_data) >= 24:  # Need at least 2 seasons
-                    seasonal_periods = min(12, len(train_data) // 3)
-                    model = ExponentialSmoothing(train_data, trend='add', seasonal='add',
-                                               seasonal_periods=seasonal_periods)
-                    fitted_model = model.fit()
-                    forecast = fitted_model.forecast(len(test_data))
+                    try:
+                        seasonal_periods = min(12, len(train_data) // 3)
+                        model = ExponentialSmoothing(train_data, trend='add', seasonal='add',
+                                                   seasonal_periods=seasonal_periods)
+                        fitted_model = model.fit()
+                        forecast = fitted_model.forecast(len(test_data))
+                    except:
+                        return None
                 else:
                     return None
 
             elif model_name == 'Holt-Winters Multiplicative':
                 # Triple Exponential Smoothing (Multiplicative)
                 if len(train_data) >= 24 and np.all(train_data > 0):  # Need positive values
-                    seasonal_periods = min(12, len(train_data) // 3)
-                    model = ExponentialSmoothing(train_data, trend='add', seasonal='mul',
-                                               seasonal_periods=seasonal_periods)
-                    fitted_model = model.fit()
-                    forecast = fitted_model.forecast(len(test_data))
+                    try:
+                        seasonal_periods = min(12, len(train_data) // 3)
+                        model = ExponentialSmoothing(train_data, trend='add', seasonal='mul',
+                                                   seasonal_periods=seasonal_periods)
+                        fitted_model = model.fit()
+                        forecast = fitted_model.forecast(len(test_data))
+                    except:
+                        return None
                 else:
                     return None
 
             elif model_name == 'AutoRegression':
                 # AutoRegression model
                 if len(train_data) >= 20:
-                    max_lags = min(10, len(train_data) // 4)
-                    model = AutoReg(train_data, lags=max_lags)
-                    fitted_model = model.fit()
-                    forecast = fitted_model.forecast(len(test_data))
+                    try:
+                        max_lags = min(10, len(train_data) // 4)
+                        model = AutoReg(train_data, lags=max_lags)
+                        fitted_model = model.fit()
+                        forecast = fitted_model.forecast(len(test_data))
+                    except:
+                        return None
                 else:
                     return None
 
             elif model_name == 'ARIMA':
-                # Auto ARIMA
+                # Auto ARIMA with better error handling
                 try:
                     model = ARIMA(train_data, order=(1, 1, 1))
                     fitted_model = model.fit()
                     forecast = fitted_model.forecast(len(test_data))
                 except:
                     # Fallback to simpler ARIMA
-                    model = ARIMA(train_data, order=(1, 0, 1))
-                    fitted_model = model.fit()
-                    forecast = fitted_model.forecast(len(test_data))
+                    try:
+                        model = ARIMA(train_data, order=(1, 0, 1))
+                        fitted_model = model.fit()
+                        forecast = fitted_model.forecast(len(test_data))
+                    except:
+                        # Final fallback to even simpler ARIMA
+                        try:
+                            model = ARIMA(train_data, order=(0, 1, 1))
+                            fitted_model = model.fit()
+                            forecast = fitted_model.forecast(len(test_data))
+                        except:
+                            return None
 
             elif model_name == 'SARIMA':
                 # Seasonal ARIMA
@@ -214,21 +238,25 @@ class AutoMLForecastingEngine:
                 else:
                     return None
 
-            if forecast is not None:
-                rmse = np.sqrt(mean_squared_error(test_data, forecast))
-                mae = mean_absolute_error(test_data, forecast)
-                r2 = r2_score(test_data, forecast) if len(np.unique(test_data)) > 1 else 0
+            # Validate results
+            if fitted_model is not None and forecast is not None and len(forecast) > 0:
+                try:
+                    rmse = float(np.sqrt(mean_squared_error(test_data, forecast)))
+                    mae = float(mean_absolute_error(test_data, forecast))
+                    r2 = float(r2_score(test_data, forecast)) if len(np.unique(test_data)) > 1 else 0.0
 
-                return {
-                    'model': fitted_model,
-                    'model_name': model_name,
-                    'rmse': rmse,
-                    'mae': mae,
-                    'r2': r2,
-                    'forecast': forecast,
-                    'train_data': train_data,
-                    'test_data': test_data
-                }
+                    return {
+                        'model': fitted_model,
+                        'model_name': model_name,
+                        'rmse': rmse,
+                        'mae': mae,
+                        'r2': r2,
+                        'forecast': forecast,
+                        'train_data': train_data,
+                        'test_data': test_data
+                    }
+                except:
+                    return None
 
         except Exception as e:
             return None
@@ -243,7 +271,7 @@ class AutoMLForecastingEngine:
 
         # Step 1: Data Preparation
         status_text.text('🔄 Preparing data...')
-        progress_bar.progress(5)
+        progress_bar.progress(0.05)
 
         df_ts = self.prepare_data(df, date_col, target_col)
         data = df_ts[target_col].values
@@ -253,7 +281,7 @@ class AutoMLForecastingEngine:
 
         # Step 2: Test ML Models
         status_text.text('🤖 Testing Machine Learning models...')
-        progress_bar.progress(15)
+        progress_bar.progress(0.15)
 
         best_config = None
         best_rmse = float('inf')
@@ -278,7 +306,7 @@ class AutoMLForecastingEngine:
 
                     # Test Linear Regression
                     config_count += 1
-                    progress_bar.progress(15 + (config_count / total_ml_configs) * 20)
+                    progress_bar.progress(0.15 + (config_count / total_ml_configs) * 0.20)
 
                     lr_result = self.train_and_evaluate_model(
                         LinearRegression(), 'Linear Regression',
@@ -301,7 +329,7 @@ class AutoMLForecastingEngine:
 
                     # Test Random Forest
                     config_count += 1
-                    progress_bar.progress(15 + (config_count / total_ml_configs) * 20)
+                    progress_bar.progress(0.15 + (config_count / total_ml_configs) * 0.20)
 
                     rf_result = self.train_and_evaluate_model(
                         RandomForestRegressor(n_estimators=50, random_state=42), 'Random Forest',
@@ -324,7 +352,7 @@ class AutoMLForecastingEngine:
 
                     # Test Neural Network
                     config_count += 1
-                    progress_bar.progress(15 + (config_count / total_ml_configs) * 20)
+                    progress_bar.progress(0.15 + (config_count / total_ml_configs) * 0.20)
 
                     scaled_data, scaler = self.scale_data(pd.Series(data))
                     X_scaled, y_scaled = self.create_sequences(scaled_data.flatten(), seq_len)
@@ -359,13 +387,13 @@ class AutoMLForecastingEngine:
 
         # Step 3: Test Time Series Models
         status_text.text('📊 Testing Time Series models...')
-        progress_bar.progress(40)
+        progress_bar.progress(0.40)
 
         ts_models = ['SES', 'Holt Linear', 'Holt-Winters Additive', 'Holt-Winters Multiplicative',
                      'AutoRegression', 'ARIMA', 'SARIMA']
 
         for i, model_name in enumerate(ts_models):
-            progress_bar.progress(40 + (i / len(ts_models)) * 35)
+            progress_bar.progress(0.40 + (i / len(ts_models)) * 0.35)
 
             for test_size in [0.2, 0.3]:
                 ts_result = self.train_time_series_model(data, model_name, test_size, forecast_steps)
@@ -392,13 +420,13 @@ class AutoMLForecastingEngine:
 
         # Step 4: Generate forecasts
         status_text.text('🎯 Generating forecasts with best model...')
-        progress_bar.progress(80)
+        progress_bar.progress(0.80)
 
         forecast = self.generate_forecast(best_config, forecast_steps)
 
         # Step 5: Complete
         status_text.text('✅ Forecasting complete!')
-        progress_bar.progress(100)
+        progress_bar.progress(1.0)
 
         # Clean up progress indicators
         import time
@@ -414,62 +442,76 @@ class AutoMLForecastingEngine:
         model_name = config['model_name']
         model_type = config.get('model_type', 'ML')
 
-        if model_type == 'TS':
-            # Time Series models - use direct forecasting
-            try:
-                future_pred = model.forecast(steps)
-                return future_pred
-            except:
-                # Fallback for some models
-                original_data = config.get('original_data', [])
-                if len(original_data) > 10:
-                    recent_trend = np.mean(np.diff(original_data[-10:]))
-                    last_value = original_data[-1]
-                    future_pred = np.array([last_value + (i + 1) * recent_trend for i in range(steps)])
-                    return future_pred
+        try:
+            if model_type == 'TS':
+                # Time Series models - use direct forecasting
+                try:
+                    future_pred = model.forecast(steps)
+                    return np.array(future_pred, dtype=float)
+                except:
+                    # Fallback for some models
+                    original_data = config.get('original_data', [])
+                    if isinstance(original_data, (list, np.ndarray)) and len(original_data) > 10:
+                        recent_data = np.array(original_data[-10:], dtype=float)
+                        recent_trend = float(np.mean(np.diff(recent_data)))
+                        last_value = float(original_data[-1])
+                        future_pred = np.array([last_value + (i + 1) * recent_trend for i in range(steps)], dtype=float)
+                        return future_pred
+                    else:
+                        return np.array([100.0] * steps, dtype=float)
+
+            elif model_name == 'Neural Network':
+                # Use scaled data for neural network
+                scaler = config['scaler']
+                original_data = config['original_data']
+                seq_len = config['seq_len']
+
+                if scaler is not None and len(original_data) >= seq_len:
+                    scaled_data, _ = self.scale_data(pd.Series(original_data))
+
+                    # Get last sequence
+                    last_sequence = scaled_data[-seq_len:].flatten()
+                    future_pred = []
+
+                    for _ in range(steps):
+                        pred = model.predict([last_sequence])
+                        future_pred.append(float(pred[0]))
+                        last_sequence = np.append(last_sequence[1:], pred[0])
+
+                    # Inverse transform predictions
+                    future_pred = np.array(future_pred, dtype=float).reshape(-1, 1)
+                    future_pred = scaler.inverse_transform(future_pred).flatten()
+                    return np.array(future_pred, dtype=float)
                 else:
-                    return np.array([100] * steps)  # Fallback
+                    # Fallback for neural network
+                    return np.array([100.0] * steps, dtype=float)
 
-        elif model_name == 'Neural Network':
-            # Use scaled data for neural network
-            scaler = config['scaler']
-            original_data = config['original_data']
-            seq_len = config['seq_len']
-            scaled_data, _ = self.scale_data(pd.Series(original_data))
-
-            # Get last sequence
-            last_sequence = scaled_data[-seq_len:].flatten()
-            future_pred = []
-
-            for _ in range(steps):
-                pred = model.predict([last_sequence])
-                future_pred.append(pred[0])
-                last_sequence = np.append(last_sequence[1:], pred[0])
-
-            # Inverse transform predictions
-            future_pred = np.array(future_pred).reshape(-1, 1)
-            future_pred = scaler.inverse_transform(future_pred).flatten()
-            return future_pred
-
-        else:
-            # For other ML models, use trend-based forecasting
-            X_test = config.get('X_test', [])
-            if len(X_test) > 0:
-                last_sequence = X_test[-1]
-                recent_trend = np.mean(np.diff(last_sequence[-5:]))
-                last_value = last_sequence[-1]
-                future_pred = np.array([last_value + (i + 1) * recent_trend for i in range(steps)])
             else:
+                # For other ML models, use trend-based forecasting
+                X_test = config.get('X_test', [])
+                if isinstance(X_test, (list, np.ndarray)) and len(X_test) > 0:
+                    last_sequence = np.array(X_test[-1], dtype=float)
+                    if len(last_sequence) >= 5:
+                        recent_data = last_sequence[-5:]
+                        recent_trend = float(np.mean(np.diff(recent_data)))
+                        last_value = float(last_sequence[-1])
+                        future_pred = np.array([last_value + (i + 1) * recent_trend for i in range(steps)], dtype=float)
+                        return future_pred
+
                 # Fallback: simple trend from original data
                 original_data = config.get('original_data', [])
-                if len(original_data) > 1:
-                    trend = np.mean(np.diff(original_data[-10:]))
-                    last_value = original_data[-1]
-                    future_pred = np.array([last_value + (i + 1) * trend for i in range(steps)])
+                if isinstance(original_data, (list, np.ndarray)) and len(original_data) > 1:
+                    recent_data = np.array(original_data[-10:], dtype=float)
+                    trend = float(np.mean(np.diff(recent_data)))
+                    last_value = float(original_data[-1])
+                    future_pred = np.array([last_value + (i + 1) * trend for i in range(steps)], dtype=float)
+                    return future_pred
                 else:
-                    future_pred = np.array([100] * steps)  # Fallback
+                    return np.array([100.0] * steps, dtype=float)
 
-            return future_pred
+        except Exception as e:
+            # Ultimate fallback
+            return np.array([100.0] * steps, dtype=float)
 
 def main():
     st.markdown('<h1 class="main-header">🧠 COGNOS 2.1</h1>', unsafe_allow_html=True)
@@ -727,12 +769,33 @@ def display_forecast_results():
         line=dict(color='#ff6b6b', width=3, dash='dot')
     ))
 
-    # Add a vertical line to separate historical and forecast
-    fig.add_vline(
+    # Add a vertical line to separate historical and forecast using add_shape
+    # Get y-axis range for the vertical line
+    all_values = list(recent_data[target_col]) + list(forecast)
+    y_min = min(all_values) * 0.95
+    y_max = max(all_values) * 1.05
+
+    fig.add_shape(
+        type="line",
+        x0=last_date, x1=last_date,
+        y0=y_min, y1=y_max,
+        line=dict(color="gray", width=2, dash="dash"),
+    )
+
+    # Add annotation for the vertical line
+    fig.add_annotation(
         x=last_date,
-        line_dash="dash",
-        line_color="gray",
-        annotation_text="Forecast Start"
+        y=y_max,
+        text="Forecast Start",
+        showarrow=True,
+        arrowhead=2,
+        arrowsize=1,
+        arrowwidth=2,
+        arrowcolor="gray",
+        font=dict(size=12, color="gray"),
+        bgcolor="white",
+        bordercolor="gray",
+        borderwidth=1
     )
 
     fig.update_layout(
